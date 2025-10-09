@@ -1,6 +1,8 @@
-import casadi as ca
+from scipy.optimize import LinearConstraint, NonlinearConstraint
+from sqp_qcqp import solve_qcqp
 import numpy as np
 import matplotlib.pyplot as plt
+from sqp_qcqp import solve_qcqp
 
 # sampling time T
 T = 0.1
@@ -148,8 +150,8 @@ def Cal_rotation(phi):
 input_seq = np.zeros((2,0))
 true_input = np.zeros((2,0))
 
-# tao init
-tao = 0
+# tao init,fangzhi chuling
+tao = 0.000000001
 k_i = 0.1;
 Z = np.array([0, 1]);
 
@@ -174,90 +176,120 @@ state_space, x_ub, x_lb, u_ub, u_lb = constranit_init(Phi,B,Np,v, w, X_o_d[0], X
 state_space = lambda x_, c_: Phi@x_ + B@c_[0:2]
 
 # free parameter
-c = np.zeros((2,0))
+input_seq = np.zeros((2,0))
+true_input = np.zeros((2,0))
+
+# tao init
+tao = 0
+k_i = 0.1
+Z = np.array([0, 1])
+
+X_o_d = np.array([0.1*tao,2*np.sin(0.1*tao),np.arctan(np.cos(0.1*tao)/np.sin(0.1*tao))])
+
+# initial error state
+error_state_seq = np.zeros(3) - X_o_d
+error_state = error_state_seq
+true_state_seq = error_state + X_o_d
+
+At, Phit, Dis, Bt, Kt, Psit, Qt, Rt, Pt = sys_init(A, B, Q, R, Phi, Psi)
+
+print(Kt)
+
+A_i, At_i, v, w, ur, phi, Phi, Phit, Dis = update_ref(tao,Np,A,At,B,K)
+
+desire_input = np.array([v, w])
+desire_state = np.array([X_o_d[0], X_o_d[1], X_o_d[2]])
+
+state_space, x_ub, x_lb, u_ub, u_lb = constranit_init(Phi,B,Np,v, w, X_o_d[0], X_o_d[1], X_o_d[2])
+
+state_space = lambda x_, c_: Phi@x_ + B@c_[0:2]
+
+# free parameter
 c_seq = np.zeros((10,0))
-
-opti = ca.Opti()
-c_opt = opti.variable(10)
-
-x = opti.parameter(3)
-Phitx = opti.parameter(15,3)
-Disx = opti.parameter(15,3)
-x_lbx = opti.parameter(15,1)
-x_ubx = opti.parameter(15,1)
-u_lbx = opti.parameter(10,1)
-u_ubx = opti.parameter(10,1)
-alp = opti.parameter(1)
-opti.set_value(x,error_state)
-opti.set_value(Phitx,Phit)
-opti.set_value(Disx,Dis)
-opti.set_value(x_lbx,x_lb)
-opti.set_value(x_ubx,x_ub)
-opti.set_value(u_lbx,u_lb)
-opti.set_value(u_ubx,u_ub)
-opti.set_value(alp,alpha)
-opti.minimize( c_opt.T@Psit@c_opt )
-opti.subject_to( Phitx@x + Bt@c_opt >= x_lbx )
-opti.subject_to( Phitx@x + Bt@c_opt <= x_ubx )
-opti.subject_to( K@x + c_opt[0:2] <= u_ub[0:2] )
-opti.subject_to( K@x + c_opt[0:2] >= u_lb[0:2] )
-# opti.subject_to( Kt@(Disx@x + Bt@c_opt) + c_opt <= u_ub )
-# opti.subject_to( Kt@(Disx@x + Bt@c_opt) + c_opt >= u_lb )
-opti.subject_to( c_opt.T@Psit@c_opt <= alp )
-opts_setting = {'ipopt.max_iter':1000, 'ipopt.print_level':0, 'print_time':0, 'ipopt.acceptable_tol':1e-6, 'ipopt.acceptable_obj_change_tol':1e-6}
-opti.solver('ipopt',opts_setting)
 
 for i in range(n):
     print(i)
-    sol = opti.solve()
-
-    cc = sol.value(c_opt)
+    # 构造QP问题
+    # min 0.5*c.T@Psit@c
+    # s.t. Phit@x + Bt@c >= x_lb
+    #      Phit@x + Bt@c <= x_ub
+    #      K@x + c[0:2] <= u_ub[0:2]
+    #      K@x + c[0:2] >= u_lb[0:2]
+    #      c.T@Psit@c <= alpha
+    def qp_obj(c):
+        return 0.5 * c @ Psit @ c
+    def qp_jac(c):
+        return Psit @ c
+    # 构造QP参数
+    H = Psit
+    f = np.zeros(10)
+    # 状态约束：Phit@x + Bt@c >= x_lb, <= x_ub
+    # 转换为二次约束形式：0.5*c'Q_i c + a_i'c + b_i <= 0
+    # 这里只支持线性约束，直接用LinearConstraint
+    # 输入约束：K@x + c[0:2] <= u_ub[0:2], >= u_lb[0:2]
+    # 也转为线性约束
+    A_list = []
+    lb_list = []
+    ub_list = []
+    # 状态约束
+    if Bt.shape[0] > 0:
+        A_list.append(Bt)
+        lb_list.append(x_lb - Phit @ error_state)
+        ub_list.append(x_ub - Phit @ error_state)
+    # 输入约束
+    A_in = np.zeros((4,10))
+    A_in[0,0] = 1
+    A_in[1,1] = 1
+    A_in[2,0] = -1
+    A_in[3,1] = -1
+    b_in = np.hstack([u_ub[0:2] - K @ error_state, -(u_lb[0:2] - K @ error_state)])
+    if True:
+        A_list.append(A_in)
+        lb_list.append(np.full(4, -np.inf))
+        ub_list.append(b_in)
+    # 合并所有线性约束
+    if len(A_list) > 0:
+        A_qp = np.vstack(A_list)
+        lb_qp = np.hstack(lb_list)
+        ub_qp = np.hstack(ub_list)
+        lin_con = LinearConstraint(A_qp, lb_qp, ub_qp)
+        Q_list = []
+        a_list = []
+        b_list = []
+        # 只用线性约束
+    else:
+        lin_con = ()
+        Q_list = []
+        a_list = []
+        b_list = []
+    # 调用QCQP求解器
+    x0 = np.zeros(10)
+    x_opt, fval_opt, _ = solve_qcqp(H, f, Q_list, a_list, b_list, x0=x0, max_iter=20, tol=1e-6, plot_history=False)
+    cc = x_opt
 
     error_state = state_space(error_state, cc)
-
     alpha = Cal_alpha(cc,Psit,Psi,beta)
 
-    X_o_d = np.array([0.1*tao,2*np.sin(0.1*tao),np.arctan(np.cos(0.1*tao)/np.sin(0.1*tao))])
-
+    phi_denom = np.sin(0.1*tao)
+    if abs(phi_denom) < 1e-8:
+        phi_denom = 1e-8
+    X_o_d = np.array([0.1*tao,2*np.sin(0.1*tao),np.arctan(np.cos(0.1*tao)/phi_denom)])
     A_i, At_i, v, w, ur, phi, Phi, Phit, Dis = update_ref(tao,Np,A,At,B,K)
-
     desire_input = np.array([v, w])
     desire_state = np.array([X_o_d[0], X_o_d[1], X_o_d[2]])
-
     state_space, x_ub, x_lb, u_ub, u_lb = constranit_init(Phi,B,Np,v, w, X_o_d[0], X_o_d[1], X_o_d[2])
 
-    opti.set_value(Phitx,Phit)
-    opti.set_value(Disx,Dis)
-    opti.set_value(x_lbx,x_lb)
-    opti.set_value(x_ubx,x_ub)
-    opti.set_value(u_lbx,u_lb)
-    opti.set_value(u_ubx,u_ub)
-    opti.set_value(x,error_state)
-    opti.set_value(alp,alpha)
-
     error_input = K@error_state + cc[0:2]
-
     true_state = error_state + X_o_d
-
     tao = tao + 0.1
-
     input = K@error_state + cc[0:2] + desire_input
-
-    cc = cc
-
     print(error_state)
-
     # storage of vectors
     error_state_seq = np.append(error_state_seq,error_state).reshape(i+2,3)
-
     true_state_seq = np.append(true_state_seq,true_state).reshape(i+2,3)
-
     c_seq = np.append(c_seq,cc).reshape(i+1,10)
-    
     input_seq = np.append(input_seq,error_input).reshape(i+1,2)
-
     true_input = np.append(true_input,input).reshape(i+1,2)
-
 
 # make data
 time = np.linspace(0, n*T, n)
