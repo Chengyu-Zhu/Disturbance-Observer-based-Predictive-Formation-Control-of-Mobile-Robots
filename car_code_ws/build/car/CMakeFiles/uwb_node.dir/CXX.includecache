@@ -1,0 +1,32 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/pooh/car_code_ws/src/car/include/motor.h
+serial/serial.h
+/home/pooh/car_code_ws/src/car/include/serial/serial.h
+iostream
+-
+fstream
+-
+mutex
+-
+thread
+-
+cmath
+-
+unistd.h
+/home/pooh/car_code_ws/src/car/include/unistd.h
+vector
+-
+algorithm
+-
+
+/home/pooh/car_code_ws/src/car/src/motor.cpp
+motor.h
+/home/pooh/car_code_ws/src/car/src/motor.h
+

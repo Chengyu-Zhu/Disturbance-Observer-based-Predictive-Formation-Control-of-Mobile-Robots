@@ -1,0 +1,6 @@
+<launch>
+
+    <include file="$(find rplidar_ros)/launch/rplidar_s2.launch" />
+    <node name = "gust_control" pkg = "gust" type = "gust_robot_node" output="screen"/> 
+    <node name="gust_rviz" pkg="rviz" type="rviz" args="-d $(find gust)/rviz/gust.rviz"/>
+</launch>

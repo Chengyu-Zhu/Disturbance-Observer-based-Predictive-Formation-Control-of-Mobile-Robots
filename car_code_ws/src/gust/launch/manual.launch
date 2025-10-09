@@ -1,0 +1,7 @@
+<launch>
+
+
+    <node name = "gust_control" pkg = "gust" type = "gust_robot_node" output="screen"/>
+
+ 
+</launch>
