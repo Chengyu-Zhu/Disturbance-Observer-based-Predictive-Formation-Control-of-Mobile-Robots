@@ -337,19 +337,5 @@ plt.ylabel('Angular Velocity',fontsize=20)
 plt.grid(True)
 plt.plot(time, true_input[:,1], linewidth=2.0)
 
-# fig = plt.figure()
-# # plot
-# plt.xlabel('time/s',fontsize=20)
-# plt.ylabel('c Velocity',fontsize=20)
-# plt.grid(True)
-# plt.plot(time, c_seq[:,1], linewidth=2.0)
-
-# fig = plt.figure()
-# # plot
-# plt.xlabel('time/s',fontsize=20)
-# plt.ylabel('c Angular Velocity',fontsize=20)
-# plt.grid(True)
-# plt.plot(time, c_seq[:,1], linewidth=2.0)
-
 plt.show()
 
