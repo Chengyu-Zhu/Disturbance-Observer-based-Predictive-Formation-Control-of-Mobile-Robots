@@ -3,4 +3,4 @@ This is the source code of paper "Disturbance Observer-based Predictive Formatio
 
 
 
-The source code is currently being organized and is expected to be released within a week (before October 16).
+The author of this article is currently employed and has a busy work schedule, but will update the code as soon as possible(before October 16).
