@@ -80,19 +80,10 @@ class DualMPC:
         self.x_lb = -6 * np.ones_like(x_des) - x_des
         self.u_ub = 0.4 * np.ones(2 * self.Np)
         self.u_lb = -0.4 * np.ones(2 * self.Np)
+        
 
     def solve_control(self, tao1, tao2):
         n = 2 * self.Np
-
-        # ensure k_i exists
-        if not hasattr(self, 'k_i'):
-            self.k_i = 0.1
-
-        # build objective according to requested form:
-        # J(c) = c' Psit c + (k_i Z)' Wt (k_i Z) + 2 k_i Z' Wt c * tao1 + 2 k_i Z' Wt c * tao2
-        # Map to solver form 0.5*c' H c + f' c with:
-        #   H = 2 * Psit
-        #   f = 2 * k_i * (tao1 + tao2) * (Wt @ Z_vec)
 
         # ensure k_i and Z exist
         if not hasattr(self, 'k_i'):
@@ -191,6 +182,25 @@ class DualMPC:
                 a_list.append(-bt_row)
                 b_list.append(rhs_lb[i_row])
 
+        # --- Add quadratic constraint c'Psit*c <= alpha (alpha updated each loop)
+        try:
+            if hasattr(self, 'last_qp_solution') and self.last_qp_solution is not None:
+                alpha_val = self.Cal_alpha(self.last_qp_solution)
+            else:
+                # fallback to stored alpha (initialized in sys_para)
+                alpha_val = getattr(self, 'alpha', 1e5)
+        except Exception:
+            alpha_val = getattr(self, 'alpha', 1e5)
+
+        # convert c'Psit*c <= alpha  -> 0.5*c'*(2*Psit)*c + 0'*c + (-alpha) <= 0
+        try:
+            Q_list.append(2.0 * self.Psit)
+            a_list.append(np.zeros(n))
+            b_list.append(-float(alpha_val))
+        except Exception:
+            # if Psit not set or shapes wrong, skip adding
+            pass
+
         # solve using solve_qcqp which expects quadratic constraints optionally
         try:
             x_opt, fval, history = solve_qcqp(H, f, Q_list, a_list, b_list, x0=np.zeros(n), max_iter=50, tol=1e-6, plot_history=False)
@@ -246,3 +256,32 @@ class DualMPC:
             self.Z = np.array([0, 1])
         self.tao = self.tao + self.k_i * self.Z @ (self.error_state[0:2] + desire_input)
         return self.tao
+
+    def Cal_alpha(self, c_opt):
+        try:
+            c = np.asarray(c_opt).reshape(-1, 1)
+            if hasattr(self, 'Psit'):
+                sc = float((c.T @ self.Psit @ c).squeeze())
+            else:
+                sc = float((c.T @ c).squeeze())
+            psi_term = 0.0
+            if hasattr(self, 'Psi'):
+                psi_term = float((c[0:2].T @ self.Psi @ c[0:2]).squeeze())
+            beta = float(getattr(self, 'beta', 0.01))
+            alpha_val = float(sc - beta * psi_term)
+            # sanity: ensure finite and non-negative (avoid infeasible negative alpha)
+            if not np.isfinite(alpha_val):
+                return float(getattr(self, 'alpha', 1e5))
+            # enforce a small positive lower bound to keep constraint feasible
+            alpha_val = max(alpha_val, 1e-6)
+            self.alpha = float(alpha_val)
+            try:
+                # record history for diagnostics
+                if not hasattr(self, 'alpha_history'):
+                    self.alpha_history = []
+                self.alpha_history.append(self.alpha)
+            except Exception:
+                pass
+            return self.alpha
+        except Exception:
+            return float(getattr(self, 'alpha', 1e5))
