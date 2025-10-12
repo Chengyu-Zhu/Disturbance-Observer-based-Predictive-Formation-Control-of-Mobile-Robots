@@ -1,0 +1,8 @@
+prefix=/home/pooh/car_code_ws/devel
+
+Name: camera
+Description: Description of camera
+Version: 0.0.0
+Cflags: -I/home/pooh/car_code_ws/devel/include
+Libs: -L${prefix}/lib 
+Requires: 

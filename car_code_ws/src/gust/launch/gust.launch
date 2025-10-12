@@ -1,0 +1,13 @@
+<launch>
+
+
+    <node name = "gust_control" pkg = "gust" type = "gust_robot_node" output="screen"/>
+
+    <include file="$(find rplidar_ros)/launch/rplidar_s2.launch" />
+    <include file="$(find gust)/launch/gust/gust_navigation.launch"/>
+
+
+    <node name="gust_rviz" pkg="rviz" type="rviz" args="-d $(find gust)/rviz/gust.rviz"/>
+
+ 
+</launch>

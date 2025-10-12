@@ -1,0 +1,37 @@
+<launch>
+    
+        
+    <arg name="cmd_vel_topic" default="cmd_vel" />
+    <arg name="odom_topic" default="odom" />
+    
+    <!-- navigation common params-->
+
+
+    <!-- car_mode and params-->
+    <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+        
+        <rosparam file="$(find gust)/params/common/local_costmap_params.yaml"      command="load" />
+        <rosparam file="$(find gust)/params/common/global_costmap_params.yaml"     command="load" />
+        <rosparam file="$(find gust)/params/common/move_base_params.yaml"          command="load" />
+        <rosparam file="$(find gust)/params/common/base_global_planner_param.yaml" command="load" />
+        
+        <!-- 全局规划器 -->
+        <!-- <param name="base_global_planner" value="RRTstar_planner/RRTstarPlannerROS"/> 
+        <rosparam file="$(find rrt_star_global_planner)/params/rrt_star_planner.yaml" command="load" /> -->
+        
+        <!-- TebLocalPlannerROS参数 -->
+        <param name="base_local_planner"    value="teb_local_planner/TebLocalPlannerROS"/>
+        <rosparam file="$(find gust)/params/gust/teb_local_planner_params_0.5.yaml"  command="load"/>
+        <!-- <rosparam file="$(find gust)/params/gust/teb_local_planner_params_1.5.yaml"  command="load"/> -->
+        
+        <rosparam file="$(find gust)/params/gust/globalmap_common_params.yaml" command="load" ns="global_costmap" />
+        <rosparam file="$(find gust)/params/gust/costmap_common_params.yaml" command="load" ns="local_costmap" />
+
+    </node>
+
+    <remap from="cmd_vel" to="$(arg cmd_vel_topic)"/>
+    <remap from="odom" to="$(arg odom_topic)"/>
+
+</launch>
+
+

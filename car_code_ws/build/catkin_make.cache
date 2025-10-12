@@ -1,0 +1,2 @@
+camera:car:control:gust
+-DCATKIN_DEVEL_PREFIX=/home/pooh/car_code_ws/devel -DCMAKE_INSTALL_PREFIX=/home/pooh/car_code_ws/install -G Unix Makefiles

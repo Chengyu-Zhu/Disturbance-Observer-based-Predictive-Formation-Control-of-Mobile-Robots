@@ -1,0 +1,34 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/pooh/car_code_ws/devel/include/**",
+        "/home/pooh/my_code/Ros_Project/turtlebot_ws/devel/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/pooh/car_code_ws/src/camera/include/**",
+        "/home/pooh/car_code_ws/src/car/include/**",
+        "/home/pooh/car_code_ws/src/control/include/**",
+        "/home/pooh/car_code_ws/src/gust/include/**",
+        "/home/pooh/my_code/Ros_Project/turtlebot_ws/src/kobuki_bumper2pc/include/**",
+        "/home/pooh/my_code/Ros_Project/turtlebot_ws/src/kobuki_desktop/kobuki_gazebo_plugins/include/**",
+        "/home/pooh/my_code/Ros_Project/turtlebot_ws/src/kobuki_keyop/include/**",
+        "/home/pooh/my_code/Ros_Project/turtlebot_ws/src/kobuki_node/include/**",
+        "/home/pooh/my_code/Ros_Project/turtlebot_ws/src/kobuki_safety_controller/include/**",
+        "/home/pooh/my_code/Ros_Project/turtlebot_ws/src/turtlebot_apps/turtlebot_actions/include/**",
+        "/home/pooh/my_code/Ros_Project/turtlebot_ws/src/yocs_cmd_vel_mux/include/**",
+        "/home/pooh/my_code/Ros_Project/turtlebot_ws/src/yocs_controllers/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
