@@ -21,13 +21,36 @@ class DualMPC:
         self.R = 1 * np.eye(2)
         self.Phi = self.A + self.B @ self.K
         self.Psi = self.R + self.B.T @ self.P @ self.B
-        self.W = 0.1 * np.eye(1)
-        self.alpha = 1e5
+        # W_{i,l} = 0.5 * I (scalar stored at [0,0])
+        self.W = 0.5 * np.eye(1)
+        # alpha_i = 0.01
+        self.alpha = 0.01
         self.beta = 0.01
 
+        # --- Disturbance observer
+        nx = self.A.shape[0]
+        self.nd = nx
+        self.D = np.eye(nx)
+        self.L = np.zeros((self.nd, nx))
+        if self.nd >= 3:
+            self.L[0, 0] = 0.89
+            self.L[1, 1] = 0.901
+            self.L[2, 2] = 0.89
+        else:
+            for i in range(self.nd):
+                self.L[i, i] = 0.89
+
+        nu = self.B.shape[1]
+        self.Kw = np.zeros((nu, self.nd))
+        try:
+            self.Kw[0, 0] = -10.0
+            self.Kw[1, 2] = -10.0
+        except Exception:
+            pass
+        self.wbar = np.zeros((self.nd,))
+        self.theta = np.zeros((self.nd,))
+
     def sys_init(self):
-        # build stacked matrices used in cost / constraints
-        # At (Np*nx x nx), Bt (Np*nx x Np*nu), Phit, Dis etc.
         nx = self.A.shape[0]
         nu = self.B.shape[1]
         self.At = np.zeros((0, nx))
@@ -234,11 +257,51 @@ class DualMPC:
             self.last_qp_fval = None
         self.last_qp_history = history
 
+        # --- Disturbance observer update (discrete) ---
+        try:
+            xk = self.error_state.copy()
+            uk = (self.K @ self.error_state + x_opt[0:2]).flatten()
+            # predicted next state (error) given c_opt
+            xbar_next = self.Cal_error_state(x_opt)
+
+            # compute theta(k+1) = - (L D - I) wbar(k) - L (A x_k + B u_k)
+            # Note: shapes: L (nd x nx), D (nx x nd), wbar (nd,), A (nx x nx), B (nx x nu), uk (nu,)
+            LD_minus_I = self.L @ self.D - np.eye(self.nd)
+            theta_next = - (LD_minus_I @ self.wbar.flatten()) - self.L @ (self.A @ xk + self.B @ uk)
+
+            # wbar(k+1) = theta(k+1) + L xbar(k+1)
+            wbar_next = theta_next + (self.L @ xbar_next).flatten()
+
+            # assign back (ensure 1D arrays)
+            try:
+                self.theta = np.asarray(theta_next).flatten()
+                self.wbar = np.asarray(wbar_next).flatten()
+            except Exception:
+                pass
+        except Exception:
+            # if observer update fails, keep previous estimates
+            pass
+
         return x_opt
 
     # helper methods
     def Cal_error_input(self, c_opt):
-        return self.K @ self.error_state + c_opt[0:2]
+        """
+        Compute feedback input with disturbance compensation:
+        u_err = K * error_state + c[0:2] + K_w * wbar
+        """
+        base = self.K @ self.error_state + c_opt[0:2]
+        # add disturbance compensation if available
+        try:
+            dw = (self.Kw @ self.wbar).flatten()
+            # ensure shape length 2
+            if dw.size == base.size:
+                return base + dw
+            else:
+                # fallback if shapes mismatch
+                return base
+        except Exception:
+            return base
 
     def Cal_error_state(self, c_opt):
         # discrete dynamics: x_{k+1} = Phi x_k + B c[0:2]
